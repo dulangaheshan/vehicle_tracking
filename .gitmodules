@@ -1,0 +1,6 @@
+[submodule "Vehicle_Tracking_Module/detection"]
+	path = Vehicle_Tracking_Module/detection
+	url = https://github.com/facebookresearch/detectron2
+[submodule "detection"]
+	path = detection
+	url = https://github.com/facebookresearch/detectron2
