@@ -5,6 +5,8 @@ from detectron2.utils.visualizer import Visualizer
 from detectron2.data import MetadataCatalog
 import cv2
 import argparse
+from os import listdir
+from os.path import isfile, join
 
 
 # def get_model(model_path, config_path, threshold):
@@ -15,6 +17,8 @@ import argparse
 #     cfg.MODEL.WEIGHTS = model_path
 #
 #     return DefaultPredictor(cfg), cfg
+from utils.crop_for_feature_extraction import crop_for_feature_extraction2
+
 
 def get_model(model_path, threshold):
     cfg = get_cfg()
@@ -61,7 +65,43 @@ if __name__ == '__main__':
     predictor, cfg = get_model(args.model, args.threshold)
 
     if args.video_path != '':
-        cap = cv2.VideoCapture(args.video_path)
+        # cap = cv2.VideoCapture(args.video_path) //if isfile(join(img_path, f))
+        cameras = [f for f in listdir(args.video_path)]
+        for cam in cameras:
+            videos = [f for f in listdir(args.video_path + "/" + cam)]
+            for video in videos:
+                video_path = args.video_path + "/" + cam + "/" + video
+                cap = cv2.VideoCapture(video_path)
+                while cap.isOpened():
+                    c1 = 1
+                    ret, image = cap.read()
+
+                    outputs = predictor(image)
+                    instances = outputs["instances"]
+                    scores = instances.get_fields()["scores"].tolist()
+                    pred_classes = instances.get_fields()["pred_classes"].tolist()
+                    pred_boxes = instances.get_fields()["pred_boxes"].tensor.tolist()
+                    # pred_masks = instances.get_fields()["pred_masks"]
+                    print(instances.get_fields())
+
+                    print(c1)
+                    crop_for_feature_extraction2(pred_boxes, image, c1, cam)
+
+
+                    # c1 = c1 + 1
+                    # v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
+                    #
+                    # v = Visualizer(image[:, :, ::-1], scale=1.2)
+                    # v = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+                    # if args.show:
+                    #     cv2.imshow('object_detection', v.get_image()[:, :, ::-1])
+                    #     if cv2.waitKey(25) & 0xFF == ord('q'):
+                    #         break
+
+                    # if args.save_path:
+                    #     out.write(image)
+                cap.release()
+
     else:
         cap = cv2.VideoCapture(0)
 
@@ -74,20 +114,32 @@ if __name__ == '__main__':
         out = cv2.VideoWriter(args.save_path, cv2.VideoWriter_fourcc('M', 'J', 'P', 'G'), 5, (width, height))
 
     while cap.isOpened():
+        c1 = 1
         ret, image = cap.read()
 
         outputs = predictor(image)
-        print(outputs)
-        # v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
-        v = Visualizer(image[:, :, ::-1], scale=1.2)
-        v = v.draw_instance_predictions(outputs["instances"].to("cpu"))
-        if args.show:
-            cv2.imshow('object_detection', v.get_image()[:, :, ::-1])
-            if cv2.waitKey(25) & 0xFF == ord('q'):
-                break
+        instances = outputs["instances"]
+        scores = instances.get_fields()["scores"].tolist()
+        pred_classes = instances.get_fields()["pred_classes"].tolist()
+        pred_boxes = instances.get_fields()["pred_boxes"].tensor.tolist()
+        # pred_masks = instances.get_fields()["pred_masks"]
+        print(instances.get_fields())
 
-        if args.save_path:
-            out.write(image)
+        print(c1)
+        crop_for_feature_extraction2(pred_boxes, image, c1)
+        c1 = c1+1
+        # v = Visualizer(image[:, :, ::-1], MetadataCatalog.get(cfg.DATASETS.TRAIN[0]), scale=1.2)
+
+
+        # v = Visualizer(image[:, :, ::-1], scale=1.2)
+        # v = v.draw_instance_predictions(outputs["instances"].to("cpu"))
+        # if args.show:
+        #     cv2.imshow('object_detection', v.get_image()[:, :, ::-1])
+        #     if cv2.waitKey(25) & 0xFF == ord('q'):
+        #         break
+        #
+        # if args.save_path:
+        #     out.write(image)
     cap.release()
     if args.save_path:
         out.release()
