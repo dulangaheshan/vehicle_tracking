@@ -1,3 +1,5 @@
+import concurrent
+
 import numpy as np
 import cv2
 import os
@@ -30,25 +32,51 @@ def draw_bbox(img, box, cls_name, identity=None, offset=(0,0)):
     cv2.putText(img,label,(x1,y1+t_size[1]+4), cv2.FONT_HERSHEY_PLAIN, 1, [255,255,255], 1)
     return img
 
+def crop_for_feature_extraction(img, x1, y1, x2, y2, id):
+        print(img)
+        print(id)
+        print(x1, y1, x2, y2)
+        img = img[y1:y1 + y2, x1:x1 + x2]
+
+        # cv2.imshow('ROI', img)
+        # cv2.waitKey()
+        cv2.imwrite(str(id) + " id.jpg", img)
+        # print(type(im))
+        return True
+
+
 
 def draw_bboxes(img, bbox, identities=None, offset=(0,0)):
     for i,box in enumerate(bbox):
+
         x1,y1,x2,y2 = [int(i) for i in box]
+        id = int(identities[i]) if identities is not None else 0
+
+
+
         x1 += offset[0]
         x2 += offset[0]
         y1 += offset[1]
         y2 += offset[1]
         # box text and bar
-        id = int(identities[i]) if identities is not None else 0    
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            executor.submit(crop_for_feature_extraction, img, x1, y1, x2, y2, id)
+        # crop_for_feature_extraction(img, x1, y1, x2, y2, id)
+
         color = COLORS_10[id%len(COLORS_10)]
         label = '{}{:d}'.format("", id)
         t_size = cv2.getTextSize(label, cv2.FONT_HERSHEY_PLAIN, 2 , 2)[0]
         cv2.rectangle(img,(x1, y1),(x2,y2),color,3)
 
-        img_croped = img[y1:y1 + y2, x1:x1 + x2]
-        cv2.imwrite(str(i), 'PImage' + '.jpg', img_croped)
-        cv2.rectangle(img,(x1, y1),(x1+t_size[0]+3,y1+t_size[1]+4), color,-1)
-        cv2.putText(img,label,(x1,y1+t_size[1]+4), cv2.FONT_HERSHEY_PLAIN, 2, [255,255,255], 2)
+        img2 = img[y1:y1+t_size[1]+4 + y2, x1:x1+t_size[0]+3 + x2]
+
+        # cv2.imshow('ROI', img)
+        # cv2.waitKey()
+        cv2.imwrite(str(id) + " id MAIN.jpg", img2)
+
+        # cv2.imwrite(str(i), 'PImage' + '.jpg', img_croped)
+        # cv2.rectangle(img,(x1, y1),(x1+t_size[0]+3,y1+t_size[1]+4), color,-1)
+        # cv2.putText(img,label,(x1,y1+t_size[1]+4), cv2.FONT_HERSHEY_PLAIN, 2, [255,255,255], 2)
     return img
 
 def softmax(x):

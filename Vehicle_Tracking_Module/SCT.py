@@ -8,6 +8,9 @@ import cv2
 from deep_sort import DeepSort
 from detectron2_detection import Detectron2
 from util import draw_bboxes
+import multiprocessing
+import concurrent.futures
+
 
 
 class Detector(object):
@@ -40,36 +43,63 @@ class Detector(object):
         if exc_type:
             print(exc_type, exc_value, exc_traceback)
 
+
+
+    def detect_from_detectron(self, im):
+        # self.crop_for_feature_extraction(im)
+        return self.detectron2.detect(im)
+
+    def deep_sort_detect(self, bbox_xcycwh, cls_conf, im):
+        # self.crop_for_feature_extraction(im)
+        return self.deepsort.update(bbox_xcycwh, cls_conf, im)
+
+
+
     def detect(self):
+        processes = []
         while self.vdo.grab():
             start = time.time()
             _, im = self.vdo.retrieve()
-            # im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
-            bbox_xcycwh, cls_conf, cls_ids = self.detectron2.detect(im)
+            im = cv2.cvtColor(im, cv2.COLOR_BGR2RGB)
+            # bbox_xcycwh, cls_conf, cls_ids = self.detectron2.detect(im)
 
-            if bbox_xcycwh is not None:
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(self.detect_from_detectron, im)
+                return_value = future.result()
+                bbox_xcycwh, cls_conf, cls_ids = return_value
+
+
+            # bbox_xcycwh, cls_conf, cls_ids = self.detect_from_detectron(im)
+                if bbox_xcycwh is not None:
                 # select class person
-                mask = cls_ids == 0
+                    mask = cls_ids == 0
 
-                bbox_xcycwh = bbox_xcycwh[mask]
-                bbox_xcycwh[:, 3:] *= 1.2
+                    bbox_xcycwh = bbox_xcycwh[mask]
+                    bbox_xcycwh[:, 3:] *= 1.2
 
-                cls_conf = cls_conf[mask]
-                outputs = self.deepsort.update(bbox_xcycwh, cls_conf, im)
-                if len(outputs) > 0:
-                    bbox_xyxy = outputs[:, :4]
-                    identities = outputs[:, -1]
-                    im = draw_bboxes(im, bbox_xyxy, identities)
+                    cls_conf = cls_conf[mask]
 
-            end = time.time()
-            print("time: {}s, fps: {}".format(end - start, 1 / (end - start)))
+                    with concurrent.futures.ThreadPoolExecutor() as executor:
+                        future = executor.submit(self.deep_sort_detect, bbox_xcycwh, cls_conf, im)
+                        return_value = future.result()
+                        outputs = return_value
 
-            if self.args.display:
-                cv2.imshow("test", im)
-                cv2.waitKey(1)
 
-            if self.args.save_path:
-                self.output.write(im)
+                    # outputs = self.deepsort.update(bbox_xcycwh, cls_conf, im)
+                        if len(outputs) > 0:
+                            bbox_xyxy = outputs[:, :4]
+                            identities = outputs[:, -1]
+                            im = draw_bboxes(im, bbox_xyxy, identities)
+
+                    end = time.time()
+                    print("time: {}s, fps: {}".format(end - start, 1 / (end - start)))
+
+                    if self.args.display:
+                        cv2.imshow("test", im)
+                        cv2.waitKey(1)
+
+                    if self.args.save_path:
+                        self.output.write(im)
             # exit(0)
 
 
@@ -91,3 +121,8 @@ if __name__ == "__main__":
     args = parse_args()
     with Detector(args) as det:
         det.detect()
+        # with concurrent.futures.ThreadPoolExecutor() as executor:
+        #     executor.submit(det.detect())
+        # p = multiprocessing.Process(target=det.detect())
+        # # processes.append(p)
+        # p.start()
