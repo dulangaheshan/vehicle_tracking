@@ -2,6 +2,7 @@ import argparse
 import os
 import time
 from distutils.util import strtobool
+from os import listdir
 
 import cv2
 
@@ -89,7 +90,7 @@ class Detector(object):
                         if len(outputs) > 0:
                             bbox_xyxy = outputs[:, :4]
                             identities = outputs[:, -1]
-                            im = draw_bboxes(im, bbox_xyxy, identities)
+                            im = draw_bboxes(im, bbox_xyxy, identities, args.camera)
 
                     end = time.time()
                     print("time: {}s, fps: {}".format(end - start, 1 / (end - start)))
@@ -105,7 +106,7 @@ class Detector(object):
 
 def parse_args():
     parser = argparse.ArgumentParser()
-    parser.add_argument("VIDEO_PATH", type=str)
+    # parser.add_argument("VIDEO_PATH", type=str)
     parser.add_argument("--deepsort_checkpoint", type=str, default="deep_sort/deep/checkpoint/ckpt.t7")
     parser.add_argument("--max_dist", type=float, default=0.3)
     # parser.add_argument('-m', '--model', type=str, required=True, help='Path to model')
@@ -114,13 +115,23 @@ def parse_args():
     parser.add_argument("--display_height", type=int, default=600)
     parser.add_argument("--save_path", type=str, default="demo.avi")
     parser.add_argument("--use_cuda", type=str, default="True")
+    parser.add_argument('-v', '--video_path', type=str, default='', help='Path to video. If None camera will be used')
     return parser.parse_args()
 
 
 if __name__ == "__main__":
     args = parse_args()
-    with Detector(args) as det:
-        det.detect()
+    cameras = [f for f in listdir(args.video_path)]
+    for cam in cameras:
+        videos = [f for f in listdir(args.video_path + "/" + cam)]
+        for video in videos:
+            video_path = args.video_path + "/" + cam + "/" + video
+            args.VIDEO_PATH = video_path
+            args.camera = cam
+            args.video = video
+            print(video_path)
+            with Detector(args) as det:
+                det.detect()
         # with concurrent.futures.ThreadPoolExecutor() as executor:
         #     executor.submit(det.detect())
         # p = multiprocessing.Process(target=det.detect())
